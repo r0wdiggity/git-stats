@@ -4,7 +4,17 @@ use reqwest::{header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT}, Clien
 use serde::Deserialize;
 use tokio::{sync::Mutex, task::JoinHandle};
 use std::{collections::HashMap, error::Error, fmt::{Display, Formatter}, hash::Hash, sync::Arc};
+use clap::Parser;
 
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about)]
+struct Args {
+    #[clap(short, long)]
+    owner: String,
+    #[clap(short, long)]
+    repo: String,
+}
 
 struct GitHubUsers(HashMap<User, UserData>);
 
@@ -172,15 +182,16 @@ fn handle_pull_requests(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let github_token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN not set");
-    let repo_owner = "icd-tech";
-    let repo_name = "2gP";
+    let args: Args = Args::parse();
+    let repo_owner = args.owner;
+    let repo_name = args.repo;
 
     let data: GitHubUsers = GitHubUsers(HashMap::new());
     let shared_data = Arc::new(Mutex::new(data));
 
     let client = reqwest::Client::new();
     let shared_client = Arc::new(client);
-    let pr_count = get_pull_requests(&shared_client, &github_token, repo_owner, repo_name, &1, &1).await?;
+    let pr_count = get_pull_requests(&shared_client, &github_token, &repo_owner, &repo_name, &1, &1).await?;
     let per_page = 30;
     let number_of_prs = &pr_count[0].number;
     let number_of_pages = (number_of_prs / per_page) + 2;
