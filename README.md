@@ -44,4 +44,18 @@ Options:
 Repos can be a single repository, or a comma separated list of repositories. The date is in the format of `YYYY-MM-DD`.
 Repos is optional, and if not provided, the program will default to all repositories in the organization.
 
+### Examples
+*get 1 repo since beginning of the year*
+```bash
+cargo run -- -o icd-tech -d 2024-1-1 -r 2gP
+```
 
+*get multiple repos data since last year*
+```bash
+cargo run -- -o icd-tech -d 2023-8-16 -r reporting,2gP   
+```
+
+*entire org from inception*
+```bash
+cargo run -- -o icd-tech
+```
