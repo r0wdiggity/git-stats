@@ -8,6 +8,15 @@ Github Statistics for the things you care about
 ```bash
 ./access_token.sh <app_id> <pem_file>
 ```
+Once you have the token, you need to set the environment variable
+```bash
+export GITHUB_TOKEN=<token>
+```
+
+This can all be done in one command:
+```bash
+export GITHUB_TOKEN=$(./access_token.sh <app_id> <pem_file> | awk '{print $2}')
+```
 
 ### Run the Program
 1. To run the program from this repo run the following command
@@ -34,3 +43,5 @@ Options:
 
 Repos can be a single repository, or a comma separated list of repositories. The date is in the format of `YYYY-MM-DD`.
 Repos is optional, and if not provided, the program will default to all repositories in the organization.
+
+
