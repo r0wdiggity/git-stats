@@ -13,7 +13,26 @@ use tokio::task::JoinSet;
 
 struct GitHubUsers(HashMap<String, UserStats>);
 
-impl Display for GitHubUsers {
+struct ScoredUser(Vec<(String, UserStats)>);
+
+impl GitHubUsers {
+    fn finalize(&mut self, weight: &u64) -> ScoredUser {
+        let mut v = Vec::new();
+        for (user, stats) in self.0.iter() {
+            let mut stats = stats.clone();
+            let score = (stats.approvals * weight) + (stats.comments * weight) + (stats.requested_changes * 2 * weight) + stats.additions + (stats.deletions * (weight / 10) );
+            stats.score = score;
+            v.push((user.clone(), stats.clone()));
+        }
+        v.sort_by(|a, b| {
+            b.1.score.cmp(&a.1.score)
+        });
+        ScoredUser(v)
+    }
+}
+
+
+impl Display for ScoredUser {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "[")?;
         for (user, data) in self.0.iter() {
@@ -21,6 +40,7 @@ impl Display for GitHubUsers {
                 f,
                 "  {{
 \"{}\":{{
+    \"Score\": {},
     \"Approvals\": {},
     \"Comments\": {}
     \"Requested Changes\": {},
@@ -31,6 +51,7 @@ impl Display for GitHubUsers {
   }}
 }},",
                 user,
+                data.score,
                 data.approvals,
                 data.comments,
                 data.requested_changes,
@@ -270,7 +291,7 @@ impl Default for User {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct UserStats {
     approvals: u64,
     requested_changes: u64,
@@ -279,6 +300,7 @@ struct UserStats {
     additions: u64,
     deletions: u64,
     changed_files: u64,
+    score: u64,
 }
 
 impl UserStats {
@@ -291,6 +313,7 @@ impl UserStats {
             additions: 0,
             deletions: 0,
             changed_files: 0,
+            score: 0,
         }
     }
 }
@@ -462,6 +485,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     let mut user_stats: GitHubUsers = GitHubUsers(HashMap::new());
+    let mut loc: u64 = 0;
+    let mut prs: u64 = 0;
     while let Some(result) = join_handles.join_next().await {
         let handle_result: Result<RepositoryResponse> = result?;
         let stats = handle_result?;
@@ -474,6 +499,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             stats.additions += pr.additions;
             stats.deletions += pr.deletions;
             stats.changed_files += pr.changed_files;
+            stats.pull_requests += 1;
+            prs += 1;
+            loc += pr.additions + pr.deletions;
             for review in pr.reviews.nodes {
                 let stats = user_stats
                     .0
@@ -497,7 +525,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    println!("{}", user_stats);
+
+    let scale = loc / prs; // Average LOC per PR
+    let scored = user_stats.finalize(&scale);
+    println!("{}", scored);
 
     Ok(())
 }
