@@ -24,6 +24,7 @@ impl Display for GitHubUsers {
     \"Approvals\": {},
     \"Comments\": {}
     \"Requested Changes\": {},
+    \"Pull Requests\": {},
     \"Additions\": {},
     \"Deletions\": {},
     \"Changed Files\": {},
@@ -33,6 +34,7 @@ impl Display for GitHubUsers {
                 data.approvals,
                 data.comments,
                 data.requested_changes,
+                data.pull_requests,
                 data.additions,
                 data.deletions,
                 data.changed_files
@@ -49,6 +51,7 @@ struct Args {
     #[arg(short, long)]
     owner: String,
     #[arg(short, long)]
+    #[arg(value_delimiter(','))]
     repos: Option<Vec<String>>,
     #[arg(short, long)]
     #[arg(value_parser=parse_date)]
@@ -272,6 +275,7 @@ struct UserStats {
     approvals: u64,
     requested_changes: u64,
     comments: u64,
+    pull_requests: u64,
     additions: u64,
     deletions: u64,
     changed_files: u64,
@@ -283,6 +287,7 @@ impl UserStats {
             approvals: 0,
             requested_changes: 0,
             comments: 0,
+            pull_requests: 0,
             additions: 0,
             deletions: 0,
             changed_files: 0,
@@ -432,13 +437,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut join_handles = JoinSet::new();
     for (i, repo) in repositories.into_iter().enumerate() {
         println!("Processing repo: {}", repo);
-        if i % 5 == 0 && i != 0 {
+        // if i % 5 == 0 && i != 0 {
+        //     println!("Sleeping for 10 seconds to avoid rate limiting");
+        //     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        // }
+        if i % 10 == 0 && i != 0 {
             println!("Sleeping for 10 seconds to avoid rate limiting");
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        }
-        if i % 10 == 0 && i != 0 {
-            println!("Sleeping for 20 seconds to avoid rate limiting");
-            tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
         }
         let client = Arc::clone(&shared_client);
         let github_token = github_token.clone();
@@ -456,44 +461,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(stats)
         });
     }
-    let mut all_stats: RepositoryResponse = RepositoryResponse::empty();
+    let mut user_stats: GitHubUsers = GitHubUsers(HashMap::new());
     while let Some(result) = join_handles.join_next().await {
         let handle_result: Result<RepositoryResponse> = result?;
         let stats = handle_result?;
-        all_stats.extend(stats);
-    }
 
-    // let mut user_stats: HashMap<String, UserStats> = HashMap::new();
-    let mut user_stats: GitHubUsers = GitHubUsers(HashMap::new());
-
-    for pr in all_stats.data.repository.pull_requests.nodes {
-        let stats = user_stats
-            .0
-            .entry(pr.author.login)
-            .or_insert(UserStats::new());
-        stats.additions += pr.additions;
-        stats.deletions += pr.deletions;
-        stats.changed_files += pr.changed_files;
-        for review in pr.reviews.nodes {
+        for pr in stats.data.repository.pull_requests.nodes {
             let stats = user_stats
                 .0
-                .entry(review.author.login)
+                .entry(pr.author.login)
                 .or_insert(UserStats::new());
-            if review.state == "APPROVED" {
-                stats.approvals += 1;
-            } else if review.state == "COMMENTED" {
-                stats.comments += 1;
-            } else if review.state == "CHANGES_REQUESTED" {
-                stats.requested_changes += 1;
+            stats.additions += pr.additions;
+            stats.deletions += pr.deletions;
+            stats.changed_files += pr.changed_files;
+            for review in pr.reviews.nodes {
+                let stats = user_stats
+                    .0
+                    .entry(review.author.login)
+                    .or_insert(UserStats::new());
+                if review.state == "APPROVED" {
+                    stats.approvals += 1;
+                } else if review.state == "COMMENTED" {
+                    stats.comments += 1;
+                } else if review.state == "CHANGES_REQUESTED" {
+                    stats.requested_changes += 1;
+                }
             }
-        }
 
-        for comment in pr.comments.nodes {
-            let stats = user_stats
-                .0
-                .entry(comment.author.login)
-                .or_insert(UserStats::new());
-            stats.comments += 1;
+            for comment in pr.comments.nodes {
+                let stats = user_stats
+                    .0
+                    .entry(comment.author.login)
+                    .or_insert(UserStats::new());
+                stats.comments += 1;
+            }
         }
     }
     println!("{}", user_stats);
