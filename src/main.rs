@@ -39,17 +39,17 @@ impl Display for ScoredUser {
             writeln!(
                 f,
                 "  {{
-\"{}\":{{
-    \"Score\": {},
-    \"Approvals\": {},
-    \"Comments\": {}
-    \"Requested Changes\": {},
-    \"Pull Requests\": {},
-    \"Additions\": {},
-    \"Deletions\": {},
-    \"Changed Files\": {},
-  }}
-}},",
+    \"{}\":{{
+        \"Score\": {},
+        \"Approvals\": {},
+        \"Comments\": {}
+        \"Requested Changes\": {},
+        \"Pull Requests\": {},
+        \"Additions\": {},
+        \"Deletions\": {},
+        \"Changed Files\": {},
+    }}
+  }},",
                 user,
                 data.score,
                 data.approvals,

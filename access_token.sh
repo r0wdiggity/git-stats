@@ -35,11 +35,12 @@ signature=$(
 
 # Create JWT
 JWT="${header_payload}"."${signature}"
-printf '%s\n' "$JWT"
 
 #use the JWT token to get installations (the id#
-installid=$(curl -i -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations | grep html_url | grep installations | cut -d '/' -f 8 | cut -d '"' -f1)
-echo "installid: $installid"
+installid=$(curl -s -i -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations | grep html_url | grep installations | cut -d '/' -f 8 | cut -d '"' -f1)
 #Now get an ACCESS TOKEN
-accesstoken=$(curl -i -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/$installid/access_tokens | grep token | cut -d '"' -f 4)
-echo "accesstoken: $accesstoken"
+accesstoken=$(curl -s -i -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/$installid/access_tokens | grep token | cut -d '"' -f 4)
+
+export GITHUB_TOKEN=$accesstoken
+
+echo "Exported GITHUB_TOKEN"
